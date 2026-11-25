@@ -1,0 +1,82 @@
+name: PayFlow CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  backend-api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend & test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run API integration tests & generate HTML report
+        run: |
+          pytest tests -m api --html=reports/api_report.html --self-contained-html
+
+      - name: Upload API report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-report
+          path: reports/api_report.html
+
+  frontend-build-and-e2e:
+    runs-on: ubuntu-latest
+    needs: backend-api-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install & build frontend
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Start backend & frontend and run non-live Selenium UI tests
+        env:
+          E2E_HEADLESS: "true"
+          E2E_RECORD_VIDEO: "true"
+          E2E_BASE_URL: "http://127.0.0.1:5173"
+          E2E_API_URL: "http://127.0.0.1:8000"
+        run: |
+          uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 &
+          (cd frontend && npm run preview -- --host 127.0.0.1 --port 5173) &
+          sleep 5
+          pytest automation/tests -m "e2e and not gateway_live" --html=reports/e2e_ci_report.html --self-contained-html
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-evidence
+          path: |
+            reports/
+            screenshots/
+            recordings/
+            logs/
