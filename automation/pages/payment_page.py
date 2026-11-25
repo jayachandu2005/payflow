@@ -33,10 +33,15 @@ class PaymentPage(BasePage):
 
     def _type_cross_origin(self, elem, text: str) -> None:
         """Type into cross-origin gateway iframe inputs with CDP Input.insertText fallback."""
-        elem.click()
-        elem.send_keys(text)
-        if not elem.get_attribute("value"):
+        for _ in range(2):
+            elem.click()
+            elem.send_keys(text)
+            if (elem.get_attribute("value") or "").replace(" ", "").replace("/", ""):
+                return
+            elem.click()
             self.driver.execute_cdp_cmd("Input.insertText", {"text": text})
+            if (elem.get_attribute("value") or "").replace(" ", "").replace("/", ""):
+                return
 
     def complete_razorpay_card_otp(
         self, otp: str = RAZORPAY_TEST_CARD["otp_success"], expect_success: bool = True
