@@ -13,7 +13,7 @@ JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=120
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://localhost:8000
-CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
 
 # Database
 # PostgreSQL (Docker / Production):
@@ -36,9 +36,9 @@ STRIPE_WEBHOOK_SECRET=whsec_replace_with_your_stripe_webhook_secret
 # ------------------------------------------------------------------------------
 # Payment Gateway 2: Razorpay Official Test Mode (https://dashboard.razorpay.com/app/keys)
 # ------------------------------------------------------------------------------
-RAZORPAY_KEY_ID=rzp_test_replace_with_your_razorpay_key_id
-RAZORPAY_KEY_SECRET=replace_with_your_razorpay_key_secret
-RAZORPAY_WEBHOOK_SECRET=replace_with_your_razorpay_webhook_secret
+RAZORPAY_KEY_ID=rzp_test_U4Ll8s1thT3t5A
+RAZORPAY_KEY_SECRET=tcwUIB0I9Ts8nF3S7O6wfblZ
+RAZORPAY_WEBHOOK_SECRET=PayFlow_Webhook_Secure_2005@3112
 
 # Default currency (USD for Stripe international / INR for Razorpay domestic)
 DEFAULT_CURRENCY=USD

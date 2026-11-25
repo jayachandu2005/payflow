@@ -18,5 +18,5 @@ class CartPage(BasePage):
     def proceed_to_checkout(self) -> None:
         self.wait_visible(self.SUMMARY_CARD)
         self.screenshot("cart_summary")
-        self.click(self.PROCEED_BTN)
+        self.js_click(self.PROCEED_BTN)
         self.wait_url_contains("/checkout")

@@ -39,10 +39,12 @@ class ProductDetailPage(BasePage):
         return self.wait_visible(self.TITLE).text
 
     def add_to_cart(self, quantity: int = 1) -> None:
-        self.type_text(self.QUANTITY, str(quantity))
-        self.click(self.ADD_TO_CART_BTN)
+        self.wait_visible(self.QUANTITY)
+        if quantity != 1:
+            self.type_text(self.QUANTITY, str(quantity))
+        self.js_click(self.ADD_TO_CART_BTN)
         self.wait_visible(self.ADDED_ALERT)
 
     def go_to_cart(self) -> None:
-        self.click(self.NAV_CART)
+        self.js_click(self.NAV_CART)
         self.wait_url_contains("/cart")

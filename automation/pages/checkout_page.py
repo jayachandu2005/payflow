@@ -40,5 +40,5 @@ class CheckoutPage(BasePage):
 
     def submit_checkout(self) -> None:
         self.screenshot("checkout_filled")
-        self.click(self.SUBMIT_BTN)
+        self.js_click(self.SUBMIT_BTN)
         self.wait_url_contains("/payment/process/")
