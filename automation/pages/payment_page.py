@@ -28,66 +28,104 @@ class PaymentPage(BasePage):
         return self.wait_visible(self.ORDER_NUMBER).text
 
     def cancel_payment(self) -> None:
-        self.click(self.CANCEL_BTN)
+        self.js_click(self.CANCEL_BTN)
         self.wait_url_contains("/payment/result/")
 
-    def complete_razorpay_card_otp(self, otp: str = RAZORPAY_TEST_CARD["otp_success"], expect_success: bool = True) -> None:
-        """Interact with genuine Razorpay Checkout iframe and simulated ACS Bank OTP window."""
-        self.click(self.LAUNCH_RAZORPAY_BTN)
+    def _type_cross_origin(self, elem, text: str) -> None:
+        """Type into cross-origin gateway iframe inputs with CDP Input.insertText fallback."""
+        elem.click()
+        elem.send_keys(text)
+        if not elem.get_attribute("value"):
+            self.driver.execute_cdp_cmd("Input.insertText", {"text": text})
+
+    def complete_razorpay_card_otp(
+        self, otp: str = RAZORPAY_TEST_CARD["otp_success"], expect_success: bool = True
+    ) -> None:
+        """Interact with genuine Razorpay Checkout iframe and hosted Bank ACS 3DS/OTP page."""
+        self.js_click(self.LAUNCH_RAZORPAY_BTN)
 
         iframe = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
             EC.presence_of_element_located(self.RAZORPAY_IFRAME)
         )
         self.driver.switch_to.frame(iframe)
-        self.screenshot("razorpay_checkout_opened")
 
-        # Select Card payment method inside Razorpay Checkout
-        card_method = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Card') or @data-value='card'] | //div[contains(@data-testid, 'card')]"))
-        )
-        card_method.click()
-
-        card_num_input = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, "input[name='card[number]'], input[placeholder*='Card Number']"))
-        )
-        card_num_input.send_keys(RAZORPAY_TEST_CARD["number"])
-
-        expiry_input = self.driver.find_element(By.CSS_SELECTOR, "input[name='card[expiry]'], input[placeholder*='MM']")
-        expiry_input.send_keys(RAZORPAY_TEST_CARD["expiry"])
-
-        cvv_input = self.driver.find_element(By.CSS_SELECTOR, "input[name='card[cvv]'], input[placeholder*='CVV']")
-        cvv_input.send_keys(RAZORPAY_TEST_CARD["cvv"])
-
+        card_selector = "input[name='card.number'], input[placeholder*='Card Number'], input[name='card[number]']"
         try:
-            name_input = self.driver.find_element(By.CSS_SELECTOR, "input[name='card[name]'], input[placeholder*='Name']")
-            if not name_input.get_attribute("value"):
-                name_input.send_keys(RAZORPAY_TEST_CARD["name"])
-        except Exception:
+            card_num_input = WebDriverWait(self.driver, 8).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, card_selector))
+            )
+        except TimeoutException:
+            card_method = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
+                EC.element_to_be_clickable(
+                    (By.XPATH, "//button[contains(., 'Card') or @data-value='card'] | //div[contains(@data-testid, 'card')]")
+                )
+            )
+            self.driver.execute_script("arguments[0].click();", card_method)
+            card_num_input = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, card_selector))
+            )
+
+        self._type_cross_origin(card_num_input, RAZORPAY_TEST_CARD["number"])
+
+        expiry_input = self.driver.find_element(
+            By.CSS_SELECTOR, "input[name='card.expiry'], input[placeholder*='MM'], input[name='card[expiry]']"
+        )
+        self._type_cross_origin(expiry_input, RAZORPAY_TEST_CARD["expiry"].replace("/", ""))
+
+        cvv_input = self.driver.find_element(
+            By.CSS_SELECTOR, "input[name='card.cvv'], input[placeholder*='CVV'], input[name='card[cvv]']"
+        )
+        self._type_cross_origin(cvv_input, RAZORPAY_TEST_CARD["cvv"])
+
+        self.screenshot("razorpay_checkout_card_filled")
+
+        cont_btn = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Continue') or contains(., 'Pay')]"))
+        )
+        self.driver.execute_script("arguments[0].click();", cont_btn)
+
+        # Dismiss RBI card-save prompt ("Maybe later") if displayed
+        try:
+            maybe_btn = WebDriverWait(self.driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Maybe later') or contains(., 'Skip')]"))
+            )
+            self.driver.execute_script("arguments[0].click();", maybe_btn)
+        except TimeoutException:
             pass
 
-        pay_btn = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit'], button[data-testid='pay-cta']"))
-        )
-        pay_btn.click()
-
-        # Switch back to top context and handle Razorpay Bank ACS OTP popup/iframe
+        # Switch back to top window and wait for Razorpay Bank 3DS/OTP popup or embedded challenge
         self.driver.switch_to.default_content()
         main_handle = self.driver.current_window_handle
 
-        WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(lambda d: len(d.window_handles) > 1 or self._find_otp_input(d) is not None)
+        WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
+            lambda d: len(d.window_handles) > 1 or self._find_otp_input(d) is not None
+        )
         if len(self.driver.window_handles) > 1:
             for handle in self.driver.window_handles:
                 if handle != main_handle:
                     self.driver.switch_to.window(handle)
                     break
 
-        otp_input = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(lambda d: self._find_otp_input(d))
-        self.screenshot("razorpay_otp_page")
-        otp_input.clear()
-        otp_input.send_keys(otp)
+        # Wait for either numeric OTP input OR Razorpay Demo Bank ACS Success/Failure buttons
+        WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
+            lambda d: self._find_otp_input(d) is not None
+            or len(d.find_elements(By.CSS_SELECTOR, "button.success, button.danger")) > 0
+        )
+        self.screenshot("razorpay_bank_3ds_otp_page")
 
-        submit_otp_btn = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit'], #submit-action")
-        submit_otp_btn.click()
+        otp_input = self._find_otp_input(self.driver)
+        if otp_input is not None:
+            self._type_cross_origin(otp_input, otp)
+            submit_otp_btn = self.driver.find_element(
+                By.CSS_SELECTOR, "button[type='submit'], input[type='submit'], #submit-action"
+            )
+            submit_otp_btn.click()
+        else:
+            btn_css = "button.success" if expect_success else "button.danger"
+            acs_btn = WebDriverWait(self.driver, GATEWAY_TIMEOUT).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, btn_css))
+            )
+            acs_btn.click()
 
         self.driver.switch_to.window(main_handle)
         self.wait_url_contains("/payment/result/", timeout=GATEWAY_TIMEOUT)

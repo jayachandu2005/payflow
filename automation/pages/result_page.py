@@ -23,11 +23,11 @@ class PaymentResultPage(BasePage):
     def wait_for_failure_or_cancelled(self) -> str:
         self.wait_visible(self.FAILED_BANNER, timeout=GATEWAY_TIMEOUT)
         self.screenshot("payment_result_failed")
-        return self.wait_visible(self.ORDER_STATUS).text
+        return self.wait_visible(self.ORDER_STATUS).text.strip().lower()
 
     def get_order_status(self) -> str:
-        return self.wait_visible(self.ORDER_STATUS).text
+        return self.wait_visible(self.ORDER_STATUS).text.strip().lower()
 
     def go_to_order_history(self) -> None:
-        self.click(self.VIEW_ORDERS_BTN)
+        self.js_click(self.VIEW_ORDERS_BTN)
         self.wait_url_contains("/orders")

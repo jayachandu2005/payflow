@@ -56,12 +56,24 @@ class BasePage:
 
     def type_text(self, locator: Tuple[str, str], text: str, clear: bool = True) -> None:
         elem = self.wait_visible(locator)
-        if clear:
-            elem.send_keys(Keys.CONTROL, "a")
-            elem.send_keys(Keys.BACK_SPACE)
-            if elem.get_attribute("value"):
-                elem.clear()
+        self.driver.execute_script("arguments[0].scrollIntoView({block: 'nearest', inline: 'nearest'});", elem)
+        elem.click()
+        if clear and elem.get_attribute("value"):
+            elem.clear()
         elem.send_keys(text)
+        # Fallback for headless Windows Chrome if send_keys drops input on React controlled fields
+        if elem.get_attribute("value") != text:
+            self.driver.execute_script(
+                """
+                const el = arguments[0], val = arguments[1];
+                const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(el, val);
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                """,
+                elem,
+                text,
+            )
 
     def screenshot(self, label: str) -> Path:
         return capture_screenshot(self.driver, label)

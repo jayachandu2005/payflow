@@ -32,11 +32,16 @@ def _create_driver():
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     try:
-        return webdriver.Chrome(options=opts)
+        driver = webdriver.Chrome(options=opts)
     except Exception:
         from webdriver_manager.chrome import ChromeDriverManager
 
-        return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=opts)
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=opts)
+    try:
+        driver.execute_cdp_cmd("Emulation.setFocusEmulationEnabled", {"enabled": True})
+    except Exception:
+        pass
+    return driver
 
 
 @pytest.fixture()
